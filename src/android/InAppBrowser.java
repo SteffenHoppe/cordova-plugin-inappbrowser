@@ -18,6 +18,8 @@
 */
 package org.apache.cordova.inappbrowser;
 
+import android.graphics.Color;
+import android.app.Activity;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
@@ -55,6 +57,7 @@ import android.widget.RelativeLayout;
 import org.apache.cordova.CallbackContext;
 import org.apache.cordova.Config;
 import org.apache.cordova.CordovaArgs;
+import org.apache.cordova.CordovaInterface;
 import org.apache.cordova.CordovaHttpAuthHandler;
 import org.apache.cordova.CordovaPlugin;
 import org.apache.cordova.CordovaWebView;
