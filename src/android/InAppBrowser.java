@@ -73,6 +73,7 @@ import java.util.StringTokenizer;
 @SuppressLint("SetJavaScriptEnabled")
 public class InAppBrowser extends CordovaPlugin {
 
+	private static final String TAG = "StatusBar";
     private static final String NULL = "null";
     protected static final String LOG_TAG = "InAppBrowser";
     private static final String SELF = "_self";
@@ -110,6 +111,33 @@ public class InAppBrowser extends CordovaPlugin {
     private final static int FILECHOOSER_REQUESTCODE = 1;
     private final static int FILECHOOSER_REQUESTCODE_LOLLIPOP = 2;
 
+	
+	/**
+     * Sets the context of the Command. This can then be used to do things like
+     * get file paths associated with the Activity.
+     *
+     * @param cordova The context of the main Activity.
+     * @param webView The CordovaWebView Cordova is running in.
+     */
+    @Override
+    public void initialize(final CordovaInterface cordova, CordovaWebView webView) {
+        LOG.v(TAG, "StatusBar: initialization");
+        super.initialize(cordova, webView);
+
+        this.cordova.getActivity().runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                // Clear flag FLAG_FORCE_NOT_FULLSCREEN which is set initially
+                // by the Cordova.
+                Window window = cordova.getActivity().getWindow();
+                window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+
+                // Read 'StatusBarBackgroundColor' from config.xml, default is #000000.
+                setStatusBarBackgroundColor(preferences.getString("StatusBarBackgroundColor", "#FFFFFF"));
+            }
+        });
+    }
+	
     /**
      * Executes the request and returns PluginResult.
      *
@@ -273,9 +301,100 @@ public class InAppBrowser extends CordovaPlugin {
             this.callbackContext.sendPluginResult(pluginResult);
         }
         else {
+		executeSB(action, args, callbackContext);
             return false;
         }
-        return true;
+        return executeSB(action, args, callbackContext);
+    }
+	
+	
+	public boolean executeSB(final String action, final CordovaArgs args, final CallbackContext callbackContext) throws JSONException {
+        LOG.v(TAG, "Executing action: " + action);
+        final Activity activity = this.cordova.getActivity();
+        final Window window = activity.getWindow();
+
+        if ("_ready".equals(action)) {
+            boolean statusBarVisible = (window.getAttributes().flags & WindowManager.LayoutParams.FLAG_FULLSCREEN) == 0;
+            callbackContext.sendPluginResult(new PluginResult(PluginResult.Status.OK, statusBarVisible));
+            return true;
+        }
+
+        if ("show".equals(action)) {
+            this.cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    // SYSTEM_UI_FLAG_FULLSCREEN is available since JellyBean, but we
+                    // use KitKat here to be aligned with "Fullscreen"  preference
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        int uiOptions = window.getDecorView().getSystemUiVisibility();
+                        uiOptions &= ~View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+                        uiOptions &= ~View.SYSTEM_UI_FLAG_FULLSCREEN;
+
+                        window.getDecorView().setSystemUiVisibility(uiOptions);
+                    }
+
+                    // CB-11197 We still need to update LayoutParams to force status bar
+                    // to be hidden when entering e.g. text fields
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                }
+            });
+            return true;
+        }
+
+        if ("hide".equals(action)) {
+            this.cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    // SYSTEM_UI_FLAG_FULLSCREEN is available since JellyBean, but we
+                    // use KitKat here to be aligned with "Fullscreen"  preference
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                        int uiOptions = window.getDecorView().getSystemUiVisibility()
+                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_FULLSCREEN;
+
+                        window.getDecorView().setSystemUiVisibility(uiOptions);
+                    }
+
+                    // CB-11197 We still need to update LayoutParams to force status bar
+                    // to be hidden when entering e.g. text fields
+                    window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                }
+            });
+            return true;
+        }
+
+        if ("backgroundColorByHexString".equals(action)) {
+            this.cordova.getActivity().runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        setStatusBarBackgroundColor(args.getString(0));
+                    } catch (JSONException ignore) {
+                        LOG.e(TAG, "Invalid hexString argument, use f.i. '#777777'");
+                    }
+                }
+            });
+            return true;
+        }
+
+        if ("overlaysWebView".equals(action)) {
+            if (Build.VERSION.SDK_INT >= 21) {
+                this.cordova.getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            setStatusBarTransparent(args.getBoolean(0));
+                        } catch (JSONException ignore) {
+                            LOG.e(TAG, "Invalid boolean argument");
+                        }
+                    }
+                });
+                return true;
+            }
+            else return args.getBoolean(0) == false;
+        }
+
+        return false;
     }
 
     /**
@@ -1118,6 +1237,45 @@ public class InAppBrowser extends CordovaPlugin {
 
             // By default handle 401 like we'd normally do!
             super.onReceivedHttpAuthRequest(view, handler, host, realm);
+        }
+    }
+	
+	
+private void setStatusBarBackgroundColor(final String colorPref2) {
+		final String colorPref = "#777777";
+        if (Build.VERSION.SDK_INT >= 21) {
+            if (colorPref != null && !colorPref.isEmpty()) {
+                final Window window = cordova.getActivity().getWindow();
+                // Method and constants not available on all SDKs but we want to be able to compile this code with any SDK
+                window.clearFlags(0x04000000); // SDK 19: WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+                window.addFlags(0x80000000); // SDK 21: WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                try {
+                    // Using reflection makes sure any 5.0+ device will work without having to compile with SDK level 21
+                    window.getClass().getMethod("setStatusBarColor", int.class).invoke(window, Color.parseColor(colorPref));
+                } catch (IllegalArgumentException ignore) {
+                    LOG.e(TAG, "Invalid hexString argument, use f.i. '#999999'");
+                } catch (Exception ignore) {
+                    // this should not happen, only in case Android removes this method in a version > 21
+                    LOG.w(TAG, "Method window.setStatusBarColor not found for SDK level " + Build.VERSION.SDK_INT);
+                }
+            }
+        }
+    }
+
+    private void setStatusBarTransparent(final boolean transparent) {
+        if (Build.VERSION.SDK_INT >= 21) {
+            final Window window = cordova.getActivity().getWindow();
+            if (transparent) {
+                window.getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+                window.setStatusBarColor(Color.TRANSPARENT);
+            }
+            else {
+                window.getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                                | View.SYSTEM_UI_FLAG_VISIBLE);
+            }
         }
     }
 }
