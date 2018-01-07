@@ -136,7 +136,17 @@ public class InAppBrowser extends CordovaPlugin {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
 
                 // Read 'StatusBarBackgroundColor' from config.xml, default is #000000.
-                setStatusBarBackgroundColor(preferences.getString("StatusBarBackgroundColor", "#FFFFFF"));
+                //setStatusBarBackgroundColor(preferences.getString("StatusBarBackgroundColor", "#FFFFFF"));
+		    	final String colorPref = "#777777";
+        //if (Build.VERSION.SDK_INT >= 21) {
+                final Window window = cordova.getActivity().getWindow();
+                // Method and constants not available on all SDKs but we want to be able to compile this code with any SDK
+                window.clearFlags(0x04000000); // SDK 19: WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+                window.addFlags(0x80000000); // SDK 21: WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                    // Using reflection makes sure any 5.0+ device will work without having to compile with SDK level 21
+                    window.setStatusBarColor(Color.parseColor(colorPref));
+            
+        //}
             }
         });
     }
@@ -339,28 +349,6 @@ public class InAppBrowser extends CordovaPlugin {
                     // CB-11197 We still need to update LayoutParams to force status bar
                     // to be hidden when entering e.g. text fields
                     window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-                }
-            });
-            return true;
-        }
-
-        if ("hide".equals(action)) {
-            this.cordova.getActivity().runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    // SYSTEM_UI_FLAG_FULLSCREEN is available since JellyBean, but we
-                    // use KitKat here to be aligned with "Fullscreen"  preference
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                        int uiOptions = window.getDecorView().getSystemUiVisibility()
-                                | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                                | View.SYSTEM_UI_FLAG_FULLSCREEN;
-
-                        window.getDecorView().setSystemUiVisibility(uiOptions);
-                    }
-
-                    // CB-11197 We still need to update LayoutParams to force status bar
-                    // to be hidden when entering e.g. text fields
-                    window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
                 }
             });
             return true;
@@ -1252,15 +1240,8 @@ private void setStatusBarBackgroundColor(final String colorPref2) {
                 // Method and constants not available on all SDKs but we want to be able to compile this code with any SDK
                 window.clearFlags(0x04000000); // SDK 19: WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
                 window.addFlags(0x80000000); // SDK 21: WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-                try {
                     // Using reflection makes sure any 5.0+ device will work without having to compile with SDK level 21
                     window.getClass().getMethod("setStatusBarColor", int.class).invoke(window, Color.parseColor(colorPref));
-                } catch (IllegalArgumentException ignore) {
-                    LOG.e(TAG, "Invalid hexString argument, use f.i. '#999999'");
-                } catch (Exception ignore) {
-                    // this should not happen, only in case Android removes this method in a version > 21
-                    LOG.w(TAG, "Method window.setStatusBarColor not found for SDK level " + Build.VERSION.SDK_INT);
-                }
             }
         }
     }
