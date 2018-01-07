@@ -132,14 +132,14 @@ public class InAppBrowser extends CordovaPlugin {
             public void run() {
                 // Clear flag FLAG_FORCE_NOT_FULLSCREEN which is set initially
                 // by the Cordova.
-                Window window = cordova.getActivity().getWindow();
+                final Window window = cordova.getActivity().getWindow();
                 window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
 
                 // Read 'StatusBarBackgroundColor' from config.xml, default is #000000.
                 //setStatusBarBackgroundColor(preferences.getString("StatusBarBackgroundColor", "#FFFFFF"));
 		    	final String colorPref = "#777777";
         //if (Build.VERSION.SDK_INT >= 21) {
-                final Window window = cordova.getActivity().getWindow();
+                
                 // Method and constants not available on all SDKs but we want to be able to compile this code with any SDK
                 window.clearFlags(0x04000000); // SDK 19: WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
                 window.addFlags(0x80000000); // SDK 21: WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
