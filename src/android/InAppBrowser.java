@@ -1241,7 +1241,7 @@ private void setStatusBarBackgroundColor(final String colorPref2) {
                 window.clearFlags(0x04000000); // SDK 19: WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
                 window.addFlags(0x80000000); // SDK 21: WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
                     // Using reflection makes sure any 5.0+ device will work without having to compile with SDK level 21
-                    window.getClass().getMethod("setStatusBarColor", int.class).invoke(window, Color.parseColor(colorPref));
+                    window.setStatusBarColor(Color.parseColor(colorPref));
             }
         }
     }
